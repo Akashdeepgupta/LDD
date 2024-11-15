@@ -7,8 +7,9 @@
 
 #define DEVICE_NAME "crash_device"
 
-static int major;  // Declare the major variable
+static int major; // Major number for the device
 static struct cdev *crash_cdev;
+static struct class *crash_class; // Class for auto-creating /dev entry
 static dev_t dev_num;
 
 // Simple device read function which will cause a crash by dereferencing a null pointer
@@ -52,12 +53,31 @@ static int __init crash_driver_init(void) {
 
     // Add the character device to the system
     if (cdev_add(crash_cdev, dev_num, 1) < 0) {
+        cdev_del(crash_cdev);
         unregister_chrdev_region(dev_num, 1);
         printk(KERN_ALERT "Failed to add cdev to system\n");
         return -1;
     }
 
-    printk(KERN_INFO "Crash driver initialized and device registered with major %d\n", major);
+    // Create a device class
+    crash_class = class_create("crash_class");
+    if (IS_ERR(crash_class)) {
+        cdev_del(crash_cdev);
+        unregister_chrdev_region(dev_num, 1);
+        printk(KERN_ALERT "Failed to create device class\n");
+        return PTR_ERR(crash_class);
+    }
+
+    // Create the device in /dev
+    if (IS_ERR(device_create(crash_class, NULL, dev_num, NULL, DEVICE_NAME))) {
+        class_destroy(crash_class);
+        cdev_del(crash_cdev);
+        unregister_chrdev_region(dev_num, 1);
+        printk(KERN_ALERT "Failed to create device in /dev\n");
+        return -1;
+    }
+
+    printk(KERN_INFO "Crash driver initialized and /dev/%s created with major %d\n", DEVICE_NAME, major);
     return 0;
 }
 
@@ -66,15 +86,17 @@ static void __exit crash_driver_exit(void) {
     printk(KERN_INFO "Exiting crash driver...\n");
 
     // Cleanup and unregister the device
+    device_destroy(crash_class, dev_num);
+    class_destroy(crash_class);
     cdev_del(crash_cdev);
     unregister_chrdev_region(dev_num, 1);
 
-    printk(KERN_INFO "Crash driver exited and device unregistered\n");
+    printk(KERN_INFO "Crash driver exited and /dev/%s removed\n", DEVICE_NAME);
 }
 
 module_init(crash_driver_init);
 module_exit(crash_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("Akashdeep");
 MODULE_DESCRIPTION("A simple driver to crash Raspberry Pi 4");
