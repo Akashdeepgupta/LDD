@@ -6,8 +6,8 @@
 #include <linux/uaccess.h>
 
 #define DEVICE_NAME "crash_device"
-#define MAJOR_NUM 240  // Major number for the device
 
+static int major;  // Declare the major variable
 static struct cdev *crash_cdev;
 static dev_t dev_num;
 
@@ -76,5 +76,5 @@ module_init(crash_driver_init);
 module_exit(crash_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Akashdeep");
+MODULE_AUTHOR("Your Name");
 MODULE_DESCRIPTION("A simple driver to crash Raspberry Pi 4");
